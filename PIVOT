@@ -1,0 +1,197 @@
+import yfinance as yf
+import pandas as pd
+import datetime as dt
+import numpy as np
+
+ticker = '^NSEI'
+start = dt.datetime.today()-dt.timedelta(60)
+end = dt.datetime.today()
+ohlcv = yf.download(ticker,start,end)
+ohlcv
+
+df=ohlcv.copy()
+df.drop(['Adj Close','Volume'],axis=1,inplace = True)
+
+df=ohlcv.copy()
+df.drop(['Adj Close','Volume'],axis=1,inplace = True)
+
+df['HC']=''
+df['LC']=''
+df['SPH']=''
+df['SPL']=''
+df['sph_V']=np.nan
+df['spl_V']=np.nan
+
+hc=0   #variable for knowing no. of  higher high & hiher close
+lc=0    #variable for  knowing no. of lower high & lower close
+spl=0   #variable for knowing  spl formed
+sph=0   #variable for knowing sph formed
+sph_v=0
+spl_v=0
+m=0     #variable to know previous sph candle no
+n=0     #variable to know previous spl candle no
+x=len(df)   #variable to know previous bar-2
+y=len(df)   #variable to know previous hc1
+z=len(df)   #variable to know previous lc1
+
+for i in range(len(df)):
+    if i == 0:
+        pass
+    elif i == 1 and df.loc[df.index[i],'High']>df.loc[df.index[i-1],'High'] and df.loc[df.index[i],'Close']>df.loc[df.index[i-1],'Close']:
+        df.loc[df.index[i],'HC']='HC1'
+        hc+=1
+    elif i == 1 and df.loc[df.index[i],'Low']<df.loc[df.index[i-1],'Low'] and df.loc[df.index[i],'Close']<df.loc[df.index[i-1],'Close']:
+        df.loc[df.index[i],'LC']='LC1'
+        lc+=1
+    elif i > 1 and x == len(df) and spl == 0 and sph == 0:
+        for j in range(i):
+            if hc <= 1 and lc <= 1 and spl == 0 and sph == 0:
+                if df.loc[df.index[i],'High']>df.loc[df.index[j],'High'] and df.loc[df.index[i],'Close']>df.loc[df.index[j],'Close']:
+                    hc+=1
+                    df.loc[df.index[i],'HC']=np.where(hc==1,'HC1','HC2')
+                    if hc == 2:
+                        x = i
+                        for k in range(i):
+                            if df.loc[df.index[k],'Low']==df.loc[df.index[0]:df.index[i],'Low'].min():
+                                df.loc[df.index[k],'SPL']='SPL'
+                                spl_v=df.loc[df.index[k],'spl_V']=df.loc[df.index[k],'Low']                                
+                                n = k
+                                spl=1
+                                hc=0
+                    break
+                elif df.loc[df.index[i],'Low']<df.loc[df.index[j],'Low'] and df.loc[df.index[i],'Close']<df.loc[df.index[j],'Close']:
+                    lc+=1
+                    df.loc[df.index[i],'LC']=np.where(lc==1,'LC1','LC2')
+                    if lc == 2:
+                        x = i
+                        for k in range(i):
+                            if df.loc[df.index[k],'High']==df.loc[df.index[0]:df.index[i],'High'].max():
+                                df.loc[df.index[k],'SPH']='SPH'
+                                sph_v=df.loc[df.index[k],'sph_V']=df.loc[df.index[k],'High']
+                                m = k
+                                sph=1
+                                lc=0
+                    break
+    elif i < x:
+        pass
+    elif i >= x:
+        if sph == 1:
+            for l in range(x,len(df)):
+                if l == x:
+                    df.loc[df.index[l],'sph_V']=np.where(sph_v==0,np.nan,sph_v)
+                    df.loc[df.index[l],'spl_V']=np.where(spl_v==0,np.nan,spl_v)
+                elif l == x+1 and sph == 1:
+                    df.loc[df.index[l],'sph_V']=np.where(sph_v==0,np.nan,sph_v)
+                    df.loc[df.index[l],'spl_V']=np.where(spl_v==0,np.nan,spl_v)
+                    if df.loc[df.index[l],'High']>df.loc[df.index[l-1],'High'] and df.loc[df.index[l],'Close']>df.loc[df.index[l-1],'Close']:
+                        df.loc[df.index[l],'HC']='HC1'
+                        hc=1
+                    else:
+                        pass
+                elif l > x+1 and sph == 1:
+                    df.loc[df.index[l],'sph_V']=np.where(sph_v==0,np.nan,sph_v)
+                    df.loc[df.index[l],'spl_V']=np.where(spl_v==0,np.nan,spl_v)
+                    for j in range(x,l):
+                        if hc == 0 and df.loc[df.index[l],'High']>df.loc[df.index[j],'High'] and df.loc[df.index[l],'Close']>df.loc[df.index[j],'Close']:
+                                hc=1
+                                df.loc[df.index[l],'HC']='HC1'
+                                y = l
+                                break
+                        elif hc == 1 and l == y :
+                            pass
+                        elif hc == 1 and df.loc[df.index[l],'High']>df.loc[df.index[j],'High'] and df.loc[df.index[l],'Close']>df.loc[df.index[j],'Close']:
+                                hc=2
+                                df.loc[df.index[l],'HC']='HC2'                      
+                                x = l
+                                for k in range(m,l+1):
+                                    if df.loc[df.index[k],'Low']==df.loc[df.index[m]:df.index[l],'Low'].min():
+                                        df.loc[df.index[k],'SPL']='SPL'
+                                        spl_v=df.loc[df.index[k],'spl_V']=df.loc[df.index[k],'Low']
+                                        n=k
+                                        spl=1
+                                        sph=0
+                                        hc=0
+                                for q in range(m,n):
+                                    if df.loc[df.index[q],'High']==df.loc[df.index[m]:df.index[n],'High'].max():
+                                        df.loc[df.index[q],'SPH']='SPH'
+                                        sph_v=df.loc[df.index[q],'sph_V']=df.loc[df.index[q],'High']
+                                break   
+                elif sph == 0:
+                    break                  
+        elif spl == 1: 
+            for l in range(x,len(df)):
+                if l == x:
+                    df.loc[df.index[l],'sph_V']=np.where(sph_v==0,np.nan,sph_v)
+                    df.loc[df.index[l],'spl_V']=np.where(spl_v==0,np.nan,spl_v)          
+                elif l == x+1 and spl == 1:
+                    df.loc[df.index[l],'sph_V']=np.where(sph_v==0,np.nan,sph_v)
+                    df.loc[df.index[l],'spl_V']=np.where(spl_v==0,np.nan,spl_v)
+                    if df.loc[df.index[l],'Low']<df.loc[df.index[l-1],'Low'] and df.loc[df.index[l],'Close']<df.loc[df.index[l-1],'Close']:
+                        df.loc[df.index[l],'LC']='LC1'
+                        lc=1
+                    else:
+                        pass
+                elif l > x+1 and spl == 1:
+                    df.loc[df.index[l],'sph_V']=np.where(sph_v==0,np.nan,sph_v)
+                    df.loc[df.index[l],'spl_V']=np.where(spl_v==0,np.nan,spl_v)
+                    for j in range(x,l):
+                        if lc == 0 and df.loc[df.index[l],'Low']<df.loc[df.index[j],'Low'] and df.loc[df.index[l],'Close']<df.loc[df.index[j],'Close']:
+                                lc=1
+                                df.loc[df.index[l],'LC']='LC1'
+                                z = l
+                                break
+                        elif lc == 1 and l == z :
+                            pass
+                        elif lc == 1 and df.loc[df.index[l],'Low']<df.loc[df.index[j],'Low'] and df.loc[df.index[l],'Close']<df.loc[df.index[j],'Close']:
+                                lc=2
+                                df.loc[df.index[l],'LC']='LC2'
+                                x = l
+                                for k in range(m,l+1):
+                                    if df.loc[df.index[k],'High']==df.loc[df.index[n]:df.index[l],'High'].max():
+                                        df.loc[df.index[k],'SPH']='SPH'
+                                        sph_v=df.loc[df.index[k],'sph_V']=df.loc[df.index[k],'High']
+                                        m = k
+                                        sph=1
+                                        spl=0
+                                        lc=0
+                                for q in range(n,m):
+                                    if df.loc[df.index[q],'Low']==df.loc[df.index[n]:df.index[m],'Low'].min():
+                                        df.loc[df.index[q],'SPL']='SPL'
+                                        spl_v=df.loc[df.index[q],'spl_V']=df.loc[df.index[q],'Low']
+                                break        
+                elif spl == 0:
+                    break
+
+#PLOTLY INTERACTIVE GRAPH
+import plotly.graph_objects as go
+
+df1=ohlcv.copy()
+df1.reset_index(inplace=True)
+fig = go.Figure(data=[go.Candlestick(x=df1['Date'],
+                open=df1['Open'],
+                high=df1['High'],
+                low=df1['Low'],
+                close=df1['Close'])])
+fig.show()
+
+
+#MATPLOTLIB LINE GRAPH
+from datetime import date
+import matplotlib.pylab as plt
+import mplfinance as mpf
+
+%matplotlib inline
+
+df3=df.copy()
+apd = mpf.make_addplot( df3[['spl_V', 'sph_V']])
+fig, axlist = mpf.plot(df3, type = 'candle', addplot = apd, returnfig = True)
+lines = axlist[0].get_lines()
+lines[0].set_color('k')
+
+#MATPLOTLIB SCATTER
+apds = [ mpf.make_addplot(df3['spl_V'],type='scatter',markersize=100,marker='^'),
+         mpf.make_addplot(df3['sph_V'],type='scatter',markersize=100,marker='v'),
+       ]
+
+mpf.plot(df3,type = 'candle',addplot=apds,figscale=1.25)
+                
